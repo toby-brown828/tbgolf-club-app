@@ -179,3 +179,17 @@ export async function unregisterPush(): Promise<void> {
     await PushNotifications.removeAllListeners()
   } catch {}
 }
+
+// ---- Google sign-in (opens web OAuth in the system browser; the server
+// redirects back into the app via the custom URL scheme with a session token) ----
+export function googleStartUrl(): string {
+  return `${BRAND.apiBase}/api/mobile/google/start?app=blacktee`
+}
+// Called when the app is reopened via the deep link carrying a token.
+export async function completeGoogleAuth(token: string): Promise<SessionUser | null> {
+  await Preferences.set({ key: TOKEN_KEY, value: token })
+  const user = await verifySession()
+  if (!user) { await signOut(); return null }
+  await Preferences.set({ key: USER_KEY, value: JSON.stringify(user) })
+  return user
+}
