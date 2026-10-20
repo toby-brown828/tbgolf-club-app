@@ -10,7 +10,7 @@ workflows:
       app_store_connect: Black Tee ASC
     environment:
       vars:
-        APP_STORE_APP_ID: "REPLACE_WITH_BLACK_TEE_APP_ID"
+        APP_STORE_APP_ID: "6824795524"
         BUNDLE_ID: "com.theblacktee.golflounge"
       node: 20
       xcode: latest
