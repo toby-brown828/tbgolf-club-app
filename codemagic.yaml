@@ -1,0 +1,57 @@
+# Codemagic CI/CD — builds the Black Tee Golf Lounge iOS app and ships it to TestFlight.
+# One-time setup in Codemagic (see SETUP.md): connect this repo, and add an
+# App Store Connect API key integration named exactly "Black Tee ASC".
+workflows:
+  blacktee-ios:
+    name: Black Tee Golf Lounge iOS (TestFlight)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: Black Tee ASC
+    environment:
+      vars:
+        APP_STORE_APP_ID: "REPLACE_WITH_BLACK_TEE_APP_ID"
+        BUNDLE_ID: "com.theblacktee.golflounge"
+      node: 20
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Install npm dependencies
+        script: npm install
+      - name: Build web assets
+        script: npm run build
+      - name: Add & sync iOS platform
+        script: |
+          [ -d ios ] || npx cap add ios
+          npx cap sync ios
+      - name: Set version + build number
+        script: |
+          cd ios/App
+          # Marketing version 1.0.0; build number = unix timestamp (always a valid,
+          # ever-increasing integer).
+          agvtool new-marketing-version 1.0.0 || true
+          agvtool new-version -all "$(date +%s)" || true
+      - name: Install CocoaPods
+        script: cd ios/App && pod install
+      - name: Create signing certificate + profile (auto)
+        script: |
+          keychain initialize
+          openssl genrsa -out /tmp/cmkey.pem 2048
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --certificate-key @file:/tmp/cmkey.pem \
+            --create
+          keychain add-certificates
+          xcode-project use-profiles
+      - name: Build IPA
+        script: |
+          xcode-project build-ipa \
+            --workspace "ios/App/App.xcworkspace" \
+            --scheme "App"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
