@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react"
 import QRCode from "qrcode"
 import { Browser } from "@capacitor/browser"
+import { App as CapApp } from "@capacitor/app"
 import {
   BRAND, SessionUser, MeResponse, Membership,
   getStoredUser, verifySession, signOut, login, me, openBillingPortal, walletPassUrl, registerPush, unregisterPush,
+  googleStartUrl, completeGoogleAuth,
   listResources, getSlots, book, upcomingBookings, BookResource, Slot, UpcomingBooking,
 } from "./lib"
 
@@ -37,6 +39,27 @@ export default function App() {
   }, [])
 
   useEffect(() => { if (user) registerPush() }, [user])
+
+  // Handle the Google sign-in deep link (theblacktee://auth?token=...)
+  useEffect(() => {
+    let handle: any
+    ;(async () => {
+      handle = await CapApp.addListener("appUrlOpen", async ({ url }) => {
+        try {
+          const q = url.split("?")[1] || ""
+          const params = new URLSearchParams(q)
+          const token = params.get("token")
+          if (token) {
+            const su = await completeGoogleAuth(token)
+            if (su) setUser(su)
+          }
+        } catch {}
+        try { await Browser.close() } catch {}
+      })
+    })()
+    return () => { if (handle) handle.remove() }
+  }, [])
+
 
   if (!ready) return <div className="app center" style={{ height: "100%" }}><Logo big /></div>
   if (!user) return <Login onSignedIn={setUser} />
@@ -101,6 +124,7 @@ function Login({ onSignedIn }: { onSignedIn: (u: SessionUser) => void }) {
           onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
         <div className="err">{err}</div>
         <button className="btn" disabled={busy} onClick={submit}>{busy ? "Signing in…" : "Sign In"}</button>
+        <button className="btn ghost" style={{ marginTop: 10 }} onClick={() => Browser.open({ url: googleStartUrl() })}>Continue with Google</button>
         <p className="center" style={{ marginTop: 18 }}>
           <a className="link" href={`${BRAND.apiBase}/pricing`}>Not a member? Join now</a>
         </p>
