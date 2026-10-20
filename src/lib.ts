@@ -33,7 +33,7 @@ export async function signOut() {
 }
 async function authHeaders(): Promise<Record<string, string>> {
   const token = await getToken()
-  return token ? { Cookie: `auth-token=${token}` } : {}
+  return token ? { Authorization: `Bearer ${token}`, Cookie: `auth-token=${token}` } : {}
 }
 
 export async function login(email: string, password: string): Promise<SessionUser> {
@@ -45,6 +45,7 @@ export async function login(email: string, password: string): Promise<SessionUse
   if (res.status >= 400) throw new Error((res.data && res.data.error) || "Login failed")
   const { token, user } = res.data as { token: string; user: SessionUser }
   await store(token, user)
+  try { await verifySession() } catch {}
   return user
 }
 
