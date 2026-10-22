@@ -16,11 +16,11 @@ html,body,#root { height:100%; margin:0; background:var(--bg); color:#fff;
   background:#1e1e1e; color:#fff; }
 .label { font-size:13px; color:var(--muted); margin:0 0 6px; }
 .err { color:#ff6b6b; font-size:14px; margin:4px 0 12px; min-height:18px; }
-.tabbar { display:flex; border-top:1px solid #222; background:#111; }
+.tabbar { display:flex; border-top:1px solid #222; background:#111; padding-bottom:env(safe-area-inset-bottom); }
 .tab { flex:1; background:none; border:0; color:var(--muted); padding:10px 0; font-size:11px; }
 .tab.active { color:#fff; }
 .tab .ico { font-size:20px; display:block; margin-bottom:2px; }
-.brandbar { display:flex; align-items:center; gap:10px; padding:14px 20px; border-bottom:1px solid #1c1c1c; }
+.brandbar { display:flex; align-items:center; gap:10px; padding:14px 20px; padding-top:calc(env(safe-area-inset-top) + 14px); border-bottom:1px solid #1c1c1c; }
 .dot { width:10px; height:10px; border-radius:50%; background:var(--red); }
 .logo { font-weight:900; letter-spacing:.5px; } .logo .r { color:var(--red); }
 .center { display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
