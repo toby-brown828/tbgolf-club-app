@@ -10,10 +10,12 @@
     "sync": "cap sync"
   },
   "dependencies": {
+    "@capacitor/android": "^6.1.2",
     "@capacitor/app": "^6.0.0",
     "@capacitor/browser": "^6.0.0",
     "@capacitor/core": "^6.1.2",
     "@capacitor/haptics": "^6.0.0",
+    "@capacitor/ios": "^6.1.2",
     "@capacitor/preferences": "^6.0.0",
     "@capacitor/push-notifications": "^6.0.0",
     "@capacitor/status-bar": "^6.0.0",
