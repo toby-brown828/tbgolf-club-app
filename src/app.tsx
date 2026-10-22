@@ -225,7 +225,7 @@ function Section({ title, items, onPick }: { title: string; items: BookResource[
         <div key={r.id} className="card" role="button" onClick={() => onPick(r)}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ fontWeight: 800 }}>{r.name}</div>
-            <div className="sub">{r.rate_member_cents && r.rate_member_cents > 0 ? `${money2(r.rate_member_cents)}/${r.duration_minutes}m` : "Included"} ›</div>
+            <div className="sub">{r.rate_member_cents && r.rate_member_cents > 0 ? `${money2(r.rate_member_cents)}${r.duration_minutes ? `/${r.duration_minutes}m` : ''}` : "Included"} ›</div>
           </div>
         </div>
       ))}
