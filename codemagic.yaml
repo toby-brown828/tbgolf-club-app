@@ -1,6 +1,18 @@
-# Codemagic CI/CD — builds the Black Tee Golf Lounge iOS app and ships it to TestFlight.
-# One-time setup in Codemagic (see SETUP.md): connect this repo, and add an
-# App Store Connect API key integration named exactly "Black Tee ASC".
+# Codemagic CI/CD — builds the Black Tee Golf Lounge apps.
+#  • blacktee-ios      -> iOS IPA, ships to TestFlight (App Store Connect)
+#  • blacktee-android  -> signed Android App Bundle (.aab) for Google Play
+#
+# One-time setup in Codemagic (see SETUP.md):
+#   - Connect this repo.
+#   - iOS: add an App Store Connect API key integration named exactly "TB Fit Club ASC".
+#   - Android: in the "tbgolf" environment group add these SECURE variables
+#       CM_KEYSTORE           = base64 of the upload keystore (blacktee-upload.jks)
+#       CM_KEYSTORE_PASSWORD  = keystore store password
+#       CM_KEY_ALIAS          = blacktee
+#       CM_KEY_PASSWORD       = key password
+#     (These come from the signing-credentials file generated during setup.)
+#     The .aab is produced as a build artifact. Auto-publish to Google Play is left
+#     disabled until a Play service account is connected (see commented block below).
 workflows:
   blacktee-ios:
     name: Black Tee Golf Lounge iOS (TestFlight)
@@ -66,3 +78,63 @@ workflows:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
+
+  blacktee-android:
+    name: Black Tee Golf Lounge Android (Play AAB)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      groups:
+        - tbgolf
+      vars:
+        PACKAGE_NAME: "com.theblacktee.golflounge"
+      node: 20
+    scripts:
+      - name: Install npm dependencies
+        script: npm install
+      - name: Build web assets
+        script: npm run build
+      - name: Add & sync Android platform
+        script: |
+          [ -d android ] || npx cap add android
+          npx cap sync android
+      - name: Decode upload keystore
+        script: |
+          if [ -z "$CM_KEYSTORE" ]; then
+            echo "ERROR: CM_KEYSTORE env var is not set. Add it (and CM_KEYSTORE_PASSWORD,"
+            echo "CM_KEY_ALIAS, CM_KEY_PASSWORD) as secure vars in the 'tbgolf' group."
+            exit 1
+          fi
+          echo "$CM_KEYSTORE" | base64 --decode > /tmp/upload.jks
+          # --- diagnostics: confirm what actually arrived in the VM ---
+          echo "DIAG jks_bytes=$(wc -c < /tmp/upload.jks)  (expected 2796)"
+          echo "DIAG jks_sha256=$(shasum -a 256 /tmp/upload.jks | awk '{print $1}')"
+          echo "DIAG expected_sha=1a53a4e81b098c89eae4e1dc34f29dd426c83e48cf6d153385e9ea378825c811"
+          echo "DIAG store_pw_len=${#CM_KEYSTORE_PASSWORD}  key_pw_len=${#CM_KEY_PASSWORD}  alias=[$CM_KEY_ALIAS]  (expected 22 / 22 / [blacktee])"
+          keytool -list -keystore /tmp/upload.jks -storepass "$CM_KEYSTORE_PASSWORD" -alias "$CM_KEY_ALIAS" >/tmp/kt.txt 2>&1
+          echo "DIAG keytool_exit=$?  ::  $(tr '\n' ' ' < /tmp/kt.txt)"
+      - name: Build signed release AAB
+        script: |
+          cd android
+          chmod +x gradlew
+          # versionName 1.0.0 (first Android release); versionCode = unix timestamp
+          # (valid integer < 2,100,000,000 and always increasing for future builds).
+          ./gradlew bundleRelease \
+            -Pandroid.injected.signing.store.file=/tmp/upload.jks \
+            -Pandroid.injected.signing.store.password="$CM_KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$CM_KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$CM_KEY_PASSWORD" \
+            -Pandroid.injected.version.code=$(date +%s) \
+            -Pandroid.injected.version.name=1.0.0
+    artifacts:
+      - android/app/build/outputs/bundle/release/*.aab
+      - android/app/build/outputs/**/*.aab
+    # Auto-publish to Google Play — enable AFTER the Play account is verified and a
+    # Play service account JSON is connected in Codemagic (store it as the secure var
+    # GCLOUD_SERVICE_ACCOUNT_CREDENTIALS). Until then the .aab above is downloaded and
+    # uploaded to Play by hand for the first release.
+    # publishing:
+    #   google_play:
+    #     credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+    #     track: internal
+    #     submit_as_draft: true
