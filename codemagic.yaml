@@ -1,18 +1,18 @@
 # Codemagic CI/CD — builds the Black Tee Golf Lounge apps.
-#  • blacktee-ios      -> iOS IPA, ships to TestFlight (App Store Connect)
-#  • blacktee-android  -> signed Android App Bundle (.aab) for Google Play
+# • blacktee-ios -> iOS IPA, ships to TestFlight (App Store Connect)
+# • blacktee-android -> signed Android App Bundle (.aab) for Google Play
 #
 # One-time setup in Codemagic (see SETUP.md):
-#   - Connect this repo.
-#   - iOS: add an App Store Connect API key integration named exactly "TB Fit Club ASC".
-#   - Android: in the "tbgolf" environment group add these SECURE variables
-#       CM_KEYSTORE           = base64 of the upload keystore (blacktee-upload.jks)
-#       CM_KEYSTORE_PASSWORD  = keystore store password
-#       CM_KEY_ALIAS          = blacktee
-#       CM_KEY_PASSWORD       = key password
-#     (These come from the signing-credentials file generated during setup.)
-#     The .aab is produced as a build artifact. Auto-publish to Google Play is left
-#     disabled until a Play service account is connected (see commented block below).
+# - Connect this repo.
+# - iOS: add an App Store Connect API key integration named exactly "TB Fit Club ASC".
+# - Android: in the "tbgolf" environment group add these SECURE variables
+#     CM_KEYSTORE = base64 of the upload keystore (blacktee-upload.jks)
+#     CM_KEYSTORE_PASSWORD = keystore store password
+#     CM_KEY_ALIAS = blacktee
+#     CM_KEY_PASSWORD = key password
+#   (These come from the signing-credentials file generated during setup.)
+# The .aab is produced as a build artifact. Auto-publish to Google Play is left
+# disabled until a Play service account is connected (see commented block below).
 workflows:
   blacktee-ios:
     name: Black Tee Golf Lounge iOS (TestFlight)
@@ -98,6 +98,14 @@ workflows:
         script: |
           [ -d android ] || npx cap add android
           npx cap sync android
+      - name: Set Android minSdkVersion to 24 (Play protection)
+        script: |
+          # Google Play's "automatic protection" enhancement requires minSdk >= 24.
+          # Capacitor's generated project defaults lower (22), so bump it on the
+          # generated Gradle project; fail loudly if the substitution did not take.
+          sed -i '' -E 's/minSdkVersion = [0-9]+/minSdkVersion = 24/' android/variables.gradle
+          grep -q 'minSdkVersion = 24' android/variables.gradle || { echo "ERROR: minSdkVersion override failed"; exit 1; }
+          echo "minSdkVersion -> $(grep minSdkVersion android/variables.gradle)"
       - name: Decode upload keystore
         script: |
           if [ -z "$CM_KEYSTORE" ]; then
@@ -107,12 +115,12 @@ workflows:
           fi
           echo "$CM_KEYSTORE" | base64 --decode > /tmp/upload.jks
           # --- diagnostics: confirm what actually arrived in the VM ---
-          echo "DIAG jks_bytes=$(wc -c < /tmp/upload.jks)  (expected 2796)"
+          echo "DIAG jks_bytes=$(wc -c < /tmp/upload.jks) (expected 2796)"
           echo "DIAG jks_sha256=$(shasum -a 256 /tmp/upload.jks | awk '{print $1}')"
           echo "DIAG expected_sha=1a53a4e81b098c89eae4e1dc34f29dd426c83e48cf6d153385e9ea378825c811"
-          echo "DIAG store_pw_len=${#CM_KEYSTORE_PASSWORD}  key_pw_len=${#CM_KEY_PASSWORD}  alias=[$CM_KEY_ALIAS]  (expected 22 / 22 / [blacktee])"
+          echo "DIAG store_pw_len=${#CM_KEYSTORE_PASSWORD} key_pw_len=${#CM_KEY_PASSWORD} alias=[$CM_KEY_ALIAS] (expected 22 / 22 / [blacktee])"
           keytool -list -keystore /tmp/upload.jks -storepass "$CM_KEYSTORE_PASSWORD" -alias "$CM_KEY_ALIAS" >/tmp/kt.txt 2>&1
-          echo "DIAG keytool_exit=$?  ::  $(tr '\n' ' ' < /tmp/kt.txt)"
+          echo "DIAG keytool_exit=$? :: $(tr '\n' ' ' < /tmp/kt.txt)"
       - name: Build signed release AAB
         script: |
           cd android
