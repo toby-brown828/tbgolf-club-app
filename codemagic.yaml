@@ -98,6 +98,15 @@ workflows:
         script: |
           [ -d android ] || npx cap add android
           npx cap sync android
+      - name: Brand the app icon (adaptive + legacy)
+        script: |
+          # Generate branded launcher icons from the committed icon sources
+          # (icon-foreground.png / icon-background.png / icon-only.png at repo root)
+          # into the freshly-generated android/app/src/main/res. Replaces the stock
+          # Capacitor placeholder. Fail loudly if generation did not run.
+          npx --yes @capacitor/assets@3 generate --android --assetPath .
+          test -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png || { echo "ERROR: icon generation did not produce mipmaps"; exit 1; }
+          echo "Branded icons generated OK"
       - name: Set Android minSdkVersion to 24 (Play protection)
         script: |
           # Google Play's "automatic protection" enhancement requires minSdk >= 24.
