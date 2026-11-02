@@ -21,6 +21,14 @@ workflows:
     integrations:
       app_store_connect: TB Fit Club ASC
     environment:
+      # Reuse the tbfit group so this iOS build can reuse the same persistent
+      # distribution certificate (CERTIFICATE_PRIVATE_KEY_B64) that the TB Fit
+      # iOS workflow uses. Distribution certs are per Apple team (TB SPORTS LLC),
+      # and both apps live in that team, so one cert signs both. This avoids
+      # minting a new cert every build and hitting Apple's distribution-cert cap
+      # (which caused "App requires a provisioning profile" at archive time).
+      groups:
+        - tbfit
       vars:
         APP_STORE_APP_ID: "6824795524"
         BUNDLE_ID: "com.theblacktee.golflounge"
@@ -68,7 +76,13 @@ workflows:
       - name: Create signing certificate + profile (auto)
         script: |
           keychain initialize
-          openssl genrsa -out /tmp/cmkey.pem 2048
+          # Reuse the persistent private key (same cert every build) when the
+          # tbfit group provides it; fall back to a fresh key only if absent.
+          if [ -n "$CERTIFICATE_PRIVATE_KEY_B64" ]; then
+            echo "$CERTIFICATE_PRIVATE_KEY_B64" | base64 --decode > /tmp/cmkey.pem
+          else
+            openssl genrsa -out /tmp/cmkey.pem 2048
+          fi
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
             --certificate-key @file:/tmp/cmkey.pem \
