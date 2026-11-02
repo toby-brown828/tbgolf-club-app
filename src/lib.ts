@@ -90,6 +90,20 @@ export async function openBillingPortal(): Promise<string> {
   if (res.status >= 400) throw new Error((res.data && res.data.error) || "Could not open billing")
   return (res.data as { url: string }).url
 }
+
+// Permanently delete the signed-in member's account (App Store requirement).
+// Cancels billing and removes personal data on the server, then clears the
+// local session. Caller should return the user to the signed-out state.
+export async function deleteAccount(): Promise<void> {
+  const res = await CapacitorHttp.post({
+    url: `${BRAND.apiBase}/api/mobile/delete-account`,
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+    data: {},
+  })
+  if (res.status >= 400) throw new Error((res.data && res.data.error) || "Could not delete account")
+  await signOut()
+}
+
 export async function walletPassUrl(): Promise<string> {
   const token = await getToken()
   return `${BRAND.apiBase}/api/mobile/wallet-pass?token=${encodeURIComponent(token || "")}`

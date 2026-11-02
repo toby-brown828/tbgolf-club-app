@@ -5,7 +5,7 @@ import { App as CapApp } from "@capacitor/app"
 import {
   BRAND, SessionUser, MeResponse, Membership,
   getStoredUser, verifySession, signOut, login, me, openBillingPortal, walletPassUrl, registerPush, unregisterPush,
-  googleStartUrl, completeGoogleAuth,
+  googleStartUrl, completeGoogleAuth, deleteAccount,
   listResources, getSlots, book, upcomingBookings, BookResource, Slot, UpcomingBooking,
 } from "./lib"
 
@@ -361,6 +361,14 @@ function Book() {
 }
 
 function Account({ user, onSignOut, onBilling }: { user: SessionUser; onSignOut: () => void; onBilling: () => void }) {
+  const [confirming, setConfirming] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState("")
+  async function doDelete() {
+    setBusy(true); setErr("")
+    try { await deleteAccount(); onSignOut() }
+    catch (e: any) { setErr(e?.message || "Could not delete account"); setBusy(false) }
+  }
   return (
     <div>
       <h1 className="h1">My Account</h1>
@@ -374,6 +382,30 @@ function Account({ user, onSignOut, onBilling }: { user: SessionUser; onSignOut:
       </div>
       <a className="card link" href={`tel:${BRAND.phone}`} style={{ display: "block" }}>📞 Call the lounge</a>
       <button className="btn ghost" style={{ marginTop: 10 }} onClick={onSignOut}>Sign out</button>
+
+      {!confirming ? (
+        <button
+          onClick={() => setConfirming(true)}
+          style={{ display: "block", margin: "18px auto 0", background: "none", border: 0, color: "#ff6b6b", fontWeight: 700 }}
+        >
+          Delete account
+        </button>
+      ) : (
+        <div className="card" style={{ marginTop: 16, borderColor: "#ef4444" }}>
+          <div style={{ fontWeight: 800, color: "#ff6b6b" }}>Delete your account?</div>
+          <p className="sub" style={{ margin: "6px 0 0" }}>
+            This cancels your membership billing and permanently removes your account and personal information. This can&rsquo;t be undone.
+          </p>
+          {err && <p className="sub" style={{ color: "#ff6b6b" }}>{err}</p>}
+          <button className="btn" style={{ marginTop: 12, background: "#dc2626", borderColor: "#dc2626" }} disabled={busy} onClick={doDelete}>
+            {busy ? "Deleting…" : "Yes, delete my account"}
+          </button>
+          <button className="btn ghost" style={{ marginTop: 8 }} disabled={busy} onClick={() => { setConfirming(false); setErr("") }}>
+            Cancel
+          </button>
+        </div>
+      )}
+
       <p className="sub center" style={{ marginTop: 20, fontSize: 12 }}>Black Tee Golf Lounge · v1.0.0</p>
     </div>
   )
