@@ -36,6 +36,15 @@ workflows:
         script: |
           [ -d ios ] || npx cap add ios
           npx cap sync ios
+      - name: Brand the app icon (iOS)
+        script: |
+          # Generate the branded iOS app icon from the committed icon sources
+          # (icon-only.png / icon-foreground.png / icon-background.png at repo root)
+          # into the freshly-generated iOS asset catalog. Replaces the stock
+          # Capacitor placeholder. Fail loudly if generation did not run.
+          npx --yes @capacitor/assets@3 generate --ios --assetPath .
+          test -d "ios/App/App/Assets.xcassets/AppIcon.appiconset" || { echo "ERROR: iOS icon generation did not run"; exit 1; }
+          echo "Branded iOS icon generated OK"
       - name: Register URL scheme + export compliance
         script: |
           PLIST=ios/App/App/Info.plist
@@ -98,15 +107,6 @@ workflows:
         script: |
           [ -d android ] || npx cap add android
           npx cap sync android
-      - name: Brand the app icon (adaptive + legacy)
-        script: |
-          # Generate branded launcher icons from the committed icon sources
-          # (icon-foreground.png / icon-background.png / icon-only.png at repo root)
-          # into the freshly-generated android/app/src/main/res. Replaces the stock
-          # Capacitor placeholder. Fail loudly if generation did not run.
-          npx --yes @capacitor/assets@3 generate --android --assetPath .
-          test -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png || { echo "ERROR: icon generation did not produce mipmaps"; exit 1; }
-          echo "Branded icons generated OK"
       - name: Set Android minSdkVersion to 24 (Play protection)
         script: |
           # Google Play's "automatic protection" enhancement requires minSdk >= 24.
@@ -115,27 +115,6 @@ workflows:
           sed -i '' -E 's/minSdkVersion = [0-9]+/minSdkVersion = 24/' android/variables.gradle
           grep -q 'minSdkVersion = 24' android/variables.gradle || { echo "ERROR: minSdkVersion override failed"; exit 1; }
           echo "minSdkVersion -> $(grep minSdkVersion android/variables.gradle)"
-      - name: Set Android versionCode (avoid Play collisions)
-        script: |
-          # versionCode 1 is already used by an earlier upload of this app, and
-          # -Pandroid.injected.version.code is not honored for bundleRelease here,
-          # so set versionCode directly in the generated Gradle project to a unix
-          # timestamp (always increasing, < 2,100,000,000). Fail loudly if it didn't take.
-          VC=$(date +%s)
-          sed -i '' -E "s/versionCode[[:space:]]+[0-9]+/versionCode $VC/" android/app/build.gradle
-          grep -q "versionCode $VC" android/app/build.gradle || { echo "ERROR: versionCode override failed"; exit 1; }
-          echo "versionCode -> $(grep versionCode android/app/build.gradle)"
-      - name: Target Android API 36 (Play requirement)
-        script: |
-          # Google Play requires new apps to target API 36+. Capacitor's generated
-          # project targets 34, so bump compile/target SDK and suppress AGP's
-          # "untested compileSdk" warning so the build proceeds. Fail loudly otherwise.
-          sed -i '' -E 's/compileSdkVersion = [0-9]+/compileSdkVersion = 36/' android/variables.gradle
-          sed -i '' -E 's/targetSdkVersion = [0-9]+/targetSdkVersion = 36/' android/variables.gradle
-          grep -q 'targetSdkVersion = 36' android/variables.gradle || { echo "ERROR: targetSdk override failed"; exit 1; }
-          grep -q 'compileSdkVersion = 36' android/variables.gradle || { echo "ERROR: compileSdk override failed"; exit 1; }
-          echo "android.suppressUnsupportedCompileSdk=36" >> android/gradle.properties
-          echo "SDKs -> $(grep -E 'compileSdkVersion|targetSdkVersion' android/variables.gradle)"
       - name: Decode upload keystore
         script: |
           if [ -z "$CM_KEYSTORE" ]; then
