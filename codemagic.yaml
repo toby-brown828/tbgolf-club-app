@@ -115,6 +115,16 @@ workflows:
           sed -i '' -E 's/minSdkVersion = [0-9]+/minSdkVersion = 24/' android/variables.gradle
           grep -q 'minSdkVersion = 24' android/variables.gradle || { echo "ERROR: minSdkVersion override failed"; exit 1; }
           echo "minSdkVersion -> $(grep minSdkVersion android/variables.gradle)"
+      - name: Set Android versionCode (avoid Play collisions)
+        script: |
+          # versionCode 1 is already used by an earlier upload of this app, and
+          # -Pandroid.injected.version.code is not honored for bundleRelease here,
+          # so set versionCode directly in the generated Gradle project to a unix
+          # timestamp (always increasing, < 2,100,000,000). Fail loudly if it didn't take.
+          VC=$(date +%s)
+          sed -i '' -E "s/versionCode[[:space:]]+[0-9]+/versionCode $VC/" android/app/build.gradle
+          grep -q "versionCode $VC" android/app/build.gradle || { echo "ERROR: versionCode override failed"; exit 1; }
+          echo "versionCode -> $(grep versionCode android/app/build.gradle)"
       - name: Decode upload keystore
         script: |
           if [ -z "$CM_KEYSTORE" ]; then
